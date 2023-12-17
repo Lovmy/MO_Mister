@@ -1,4 +1,4 @@
-# Thomson computers core for MiSTer
+# Thomson MO5 & MO6 pour Mister FPGA
 
 ## General description
 
