@@ -191,7 +191,7 @@ wire [15:0] joystick_analog_0,joystick_analog_1;
 // 0         1         2         3          4         5         6   
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-//   XX XXXXXXxx
+//   XX XXXXXXxX
 
 `include "build_id.v" 
 localparam CONF_STR = {
@@ -203,7 +203,7 @@ localparam CONF_STR = {
 	"O7,OVO,Off,On;",
 	"O8,Model,MO6,MO5;",
 	"O9,Fast,Off,On;",
-	"OB,Light pen,Mouse,SNAC;",
+	// "OB,Light pen,Mouse,SNAC;",
 	"d0OC,Screen border,Off,On;",
 	"TA,Rewind Tape;",
 	"-;",
