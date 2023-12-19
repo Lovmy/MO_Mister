@@ -2,10 +2,10 @@
 
 ## Description
 
-Core <a href="https://fr.wikipedia.org/wiki/Thomson_MO5" target="_blank">MO5</a> & <a href="https://fr.wikipedia.org/wiki/Thomson_MO6" target="_blank">MO6</a>, 
-basé sur la code original de <a href="https://github.com/Grabulosaure/MO_MiSTer">Grabulosaure</a>.
+Core [MO5](https://fr.wikipedia.org/wiki/Thomson_MO5) & [MO6](https://fr.wikipedia.org/wiki/Thomson_MO6), 
+basé sur la code original de [Grabulosaure](https://github.com/Grabulosaure/MO_MiSTer).
 
-<img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Thomson_MO5_%28CNAM-IMG_0575%29.jpg/800px-Thomson_MO5_%28CNAM-IMG_0575%29.jpg" alt="MO5"/>
+![Image du MO5](https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Thomson_MO5_%28CNAM-IMG_0575%29.jpg/800px-Thomson_MO5_%28CNAM-IMG_0575%29.jpg)
 
 ## Ajout lors de la mise à jour du MiSTer
 
@@ -21,15 +21,15 @@ db_url = https://raw.githubusercontent.com/Lovmy/MO_Mister-main/db/db.json.zip
 Je débute dans la programmation en Verilog/VHDL. J'ai repris le code fait par Grabulosaure et j'essai d'y apporter des améliorations.<br/>
 Dans la dernière version l'image est mal cadré sur un écran cathodique :
 
-<img src="https://banaszak.fr/MiSTer/ORIGINAL.PNG" alt="Original"/>
+![Original](https://banaszak.fr/MiSTer/ORIGINAL.PNG)
 
 J'ai centré l'image:
 
-<img src="https://banaszak.fr/MiSTer/CENTRE.PNG" alt="Original"/>
+![Centrage](https://banaszak.fr/MiSTer/CENTRE.PNG)
 
 Et j'ai ajouté l'affichage de la bordure:
 
-<img src="https://banaszak.fr/MiSTer/BORDURE.PNG" alt="Original"/>
+![Bordure](https://banaszak.fr/MiSTer/BORDURE.PNG)
 
 ## Evolution
 
