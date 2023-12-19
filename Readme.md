@@ -33,5 +33,5 @@ Et j'ai ajouté l'affichage de la bordure:
 
 ## Evolution
 
-Je vais continuer de l'entrainer sur ce core pour y apporter la prise en charge des cartouches et du crayon optique via le port User IO.<br/>
+Je vais continuer de m'entrainer sur ce core pour y apporter la prise en charge des cartouches et du crayon optique via le port User IO.<br/>
 Pour ce dernier point je vais me baser sur [MiSTerLaggy](https://github.com/MiSTer-devel/MiSTerLaggy_MiSTer).
