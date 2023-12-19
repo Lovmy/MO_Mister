@@ -47,6 +47,7 @@ ENTITY movideo IS
     
     ------------------------------------
     mo5     : IN  std_logic;
+	 bordure : IN  std_logic;
     vmode   : IN  uv3;
     vborder : IN  uv4;
     vtrame  : IN  std_logic;
@@ -166,11 +167,17 @@ ARCHITECTURE rtl OF movideo IS
   SIGNAL vid_hs1,vid_hs2,vid_hs3 : std_logic;
   SIGNAL vid_vde1,vid_vde2,vid_vde3 : std_logic;
   SIGNAL vid_de1,vid_de2,vid_de3 : std_logic;
+  
+  SIGNAL decalage_x, decalage_y : integer;
     
 BEGIN
   
   PROCESS(clk,reset_na) IS
   BEGIN
+  
+	decalage_x <= 144;
+	decalage_y <= 64;
+	
     IF reset_na='0' THEN
       pulse50hz<='0';
       
@@ -268,7 +275,7 @@ BEGIN
       END IF;
 
       pulse50hz<='0';
-      IF divcpt MOD 32 = 31 AND hcpt<640 THEN
+      IF divcpt MOD 32 = 31 AND hcpt > decalage_x AND hcpt< ( 640+decalage_x ) AND vcpt > decalage_y THEN
         pos<=pos+1;
       END IF;
       
@@ -285,10 +292,10 @@ BEGIN
         ELSE
           hcpt<=hcpt+1;
         END IF;
-        
-        pulse50hz<=to_std_logic(vcpt=240 AND hcpt=0);
-        vid_de3<=to_std_logic(vcpt<200 AND hcpt<640);
-        vid_vde3<=to_std_logic(vcpt<200);
+		  
+		  pulse50hz<=to_std_logic( vcpt=( 240+decalage_y ) AND hcpt=0 );
+        vid_de3<=to_std_logic( ( vcpt > decalage_y AND vcpt< ( 200 + decalage_y ) ) AND ( hcpt > decalage_x AND hcpt<( 640+decalage_x ) ) );
+        vid_vde3<=to_std_logic( vcpt > decalage_y AND vcpt < ( 200 + decalage_y ) );
         vid_hs3<=to_std_logic(hcpt>=1024-160);
         IF vtrame='0' THEN
           vid_vs3<=to_std_logic(vcpt>312-5);
@@ -309,9 +316,15 @@ BEGIN
 
       vid_vs<=vid_vs1;
       vid_hs<=vid_hs1;
-      vid_de<=vid_de1;
       vid_vde<=vid_vde1;
-      
+		IF mo5='1' AND bordure='1' AND vid_hs1='0' AND vid_vs1='0' AND vid_de1='0' AND vcpt > 16 AND hcpt > 64 THEN
+			vid_r<=PAL_MO5_R(to_integer(vborder));
+			vid_g<=PAL_MO5_V(to_integer(vborder));
+			vid_b<=PAL_MO5_B(to_integer(vborder));
+			vid_de<='1';
+		ELSE
+			vid_de<=vid_de1;
+      END IF;
       -----------------------------------
     END IF;
     

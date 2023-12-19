@@ -38,6 +38,10 @@ ENTITY mo_core IS
     fast              : IN std_logic;
     ovo_ena           : IN std_logic;
     capslock          : OUT std_logic;
+	 
+	 crayon            : IN std_logic;
+	 bordure           : IN std_logic;
+	 snac              : IN std_logic_vector(6 DOWNTO 0);
     
     -- Base video clock. Usually equals to CLK_SYS.
     clk_video         : OUT   std_logic;
@@ -393,6 +397,7 @@ BEGIN
       pal_dr    => pal_dr,
       pal_wr    => pal_wr,
       mo5       => mo5,
+		bordure   => bordure,
       vmode     => vmode,
       vborder   => vborder,
       vtrame    => vtrame,
@@ -989,7 +994,8 @@ BEGIN
     pia1_pb_i(7)<=NOT kr_v(to_integer(pia1_pb_o(6 DOWNTO 4)));
   END PROCESS;
   
-  capslock<=pia1_pa_o(4);
+  -- capslock<=pia1_pa_o(4);
+  capslock <= crayon;
   
   ----------------------------------------------------------
   KeyCodes:PROCESS (sysclk,reset_na) IS
@@ -1416,40 +1422,52 @@ BEGIN
     VARIABLE tmp : integer RANGE -1024*8 TO 1024*8-1;
   BEGIN
     IF rising_edge(sysclk) THEN
-      ps2_mouse_delay<=ps2_mouse;
-      
-      IF ps2_mouse(24)/=ps2_mouse_delay(24) THEN
-        tmp:=mxpos+to_integer(signed(ps2_mouse(15 DOWNTO 8)));
-        IF tmp<-32*4 THEN tmp:=-32*4; END IF;
-        IF tmp>=(320+32)*4 THEN tmp:=(320+32)*4; END IF;
-        mxpos<=tmp;
-        
-        tmp:=mypos-to_integer(signed(ps2_mouse(23 DOWNTO 16)));
-        IF tmp<=-32*4 THEN tmp:=-32*4; END IF;
-        IF tmp>=(200+32)*4 THEN tmp:=(200+32)*4; END IF;
-        mypos<=tmp;
-      END IF;
-      
-      xpos<=mxpos/4;
-      ypos<=mypos/4;
-      
-      -- 320 pix/ligne 
-      ta<=to_unsigned(vid_vpos * 40 + vid_hpos/2/8,13);
-      ta_h124<= to_unsigned((vid_hpos/2) MOD 8,3) +  "110";
-      
-      IF azerty='1' THEN ta_h124<="000"; END IF;
-      
-      -- 0x280   => 0x50
-      lpen_irq<=(lpen_irq OR
-                 to_std_logic(xpos=vid_hpos/2 AND
-                              (ypos  =vid_vpos OR ypos+1=vid_vpos OR
-                               ypos+2=vid_vpos OR ypos+3=vid_vpos))) AND
-                 to_std_logic(xpos>=0 AND ypos>=0 AND xpos<=639 AND ypos<=199)
-                 AND selreg AND NOT lpen_clr;
-      
-      lpen_button<=ps2_mouse(0);
-      
+
+		IF crayon='1' THEN
+		
+			-- TODO : Prendre en compte le crayon optique
+		
+			xpos<=10;
+			ypos<=10;
+			lpen_button<=ps2_mouse(0);
+			
+		ELSE
+		
+			ps2_mouse_delay<=ps2_mouse;
+			
+			IF ps2_mouse(24)/=ps2_mouse_delay(24) THEN
+				tmp:=mxpos+to_integer(signed(ps2_mouse(15 DOWNTO 8)));
+				IF tmp<-32*4 THEN tmp:=-32*4; END IF;
+				IF tmp>=(320+32)*4 THEN tmp:=(320+32)*4; END IF;
+				mxpos<=tmp;
+				
+				tmp:=mypos-to_integer(signed(ps2_mouse(23 DOWNTO 16)));
+				IF tmp<=-32*4 THEN tmp:=-32*4; END IF;
+				IF tmp>=(200+32)*4 THEN tmp:=(200+32)*4; END IF;
+				mypos<=tmp;
+			END IF;
+			
+			xpos<=mxpos/4;
+			ypos<=mypos/4;
+			
+			-- 320 pix/ligne 
+			ta<=to_unsigned(vid_vpos * 40 + vid_hpos/2/8,13);
+			ta_h124<= to_unsigned((vid_hpos/2) MOD 8,3) +  "110";
+			
+			IF azerty='1' THEN ta_h124<="000"; END IF;
+			
+			-- 0x280   => 0x50
+			lpen_irq<=( lpen_irq OR
+							to_std_logic(xpos=vid_hpos/2 AND
+							(ypos  =vid_vpos OR ypos+1=vid_vpos OR ypos+2=vid_vpos OR ypos+3=vid_vpos))) AND
+							to_std_logic(xpos>=0 AND ypos>=0 AND xpos<=639 AND ypos<=199)
+							AND selreg AND NOT lpen_clr;
+			lpen_button<=ps2_mouse(0);
+			
+		END IF;
+			
     END IF;
+		
   END PROCESS;
   -- ----------------------------------------------------------
   -- Joysticks

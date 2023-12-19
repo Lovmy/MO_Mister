@@ -184,6 +184,15 @@ wire        ioctl_wait;
 wire [31:0] joystick_0,joystick_1;
 wire [15:0] joystick_analog_0,joystick_analog_1;
 
+// https://mister-devel.github.io/MkDocs_MiSTer/developer/hps_io/
+// https://mister-devel.github.io/MkDocs_MiSTer/developer/conf_str/
+
+//             Upper                             Lower              
+// 0         1         2         3          4         5         6   
+// 01234567890123456789012345678901 23456789012345678901234567890123
+// 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
+//   XX XXXXXXxx
+
 `include "build_id.v" 
 localparam CONF_STR = {
 	"MO;;",
@@ -194,6 +203,8 @@ localparam CONF_STR = {
 	"O7,OVO,Off,On;",
 	"O8,Model,MO6,MO5;",
 	"O9,Fast,Off,On;",
+	"OB,Light pen,Mouse,SNAC;",
+	"d0OC,Screen border,Off,On;",
 	"TA,Rewind Tape;",
 	"-;",
 	"R0,Reset;",
@@ -203,6 +214,7 @@ localparam CONF_STR = {
 wire forced_scandoubler;
 wire  [1:0] buttons;
 wire [31:0] status;
+wire  [1:0] status_menumask = { status[11], status[8] };
 wire [10:0] ps2_key;
 wire [24:0] ps2_mouse;
 
@@ -225,6 +237,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
+	.status_menumask(status_menumask),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
@@ -269,6 +282,10 @@ mo_core mo_core
 	.fast(status[9]),
 	.ovo_ena(status[7]),
 	.capslock(LED_USER),
+	
+	.crayon(status[11]),
+	.bordure(status[12]),
+	.snac(USER_IN),
  
 	.clk_video(CLK_VIDEO),
 	.ce_pixel(CE_PIXEL),
