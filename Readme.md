@@ -13,7 +13,7 @@ Ajouter la ligne suivante dans la fichier `downloader.ini` puis effectuer un *do
 
 ```ini
 [Lovmy]
-db_url = https://raw.githubusercontent.com/Lovmy/MO_Mister-main/db/db.json.zip
+db_url = https://raw.githubusercontent.com/Lovmy/MiSTer/db/db.json.zip
 ```
 
 ## Developpement
