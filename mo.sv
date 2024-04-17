@@ -175,6 +175,7 @@ wire [1:0] ar = status[3:2];
 assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
 assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 
+wire [31:0] ioctl_file_ext;
 wire        ioctl_download;
 wire [7:0]  ioctl_index;
 wire        ioctl_wr;
@@ -197,7 +198,8 @@ wire [15:0] joystick_analog_0,joystick_analog_1;
 localparam CONF_STR = {
 	"MO;;",
 	"-;",
-	"F,WAV,Load tape;",
+	"F0,WAV,Load tape;",
+	"F1,ROM,Load cartridge,503316480;",				// ddram_addr(28 DOWNTO 25)<="1111";, reste a 0.
 	"O23,Aspect ratio,4:3,16:9,[ARC1],[ARC2];",
 	"O56,Keyboard,DCMOTO,QWERTY,AZERTY;",
 	"O7,OVO,Off,On;",
@@ -222,8 +224,6 @@ wire azerty,dcmoto;
 
 assign azerty = status[6] & !status[5];
 assign dcmoto = !status[5] & !status[6];
-   
-   
 
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
@@ -238,13 +238,14 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.status_menumask(status_menumask),
-
-	.ioctl_download(ioctl_download),
-	.ioctl_index(ioctl_index),
+	
+	.ioctl_download(ioctl_download),		// signal indicating an active download
+	.ioctl_index(ioctl_index),				// menu index used to upload the file
 	.ioctl_wr(ioctl_wr),
-	.ioctl_addr(ioctl_addr),
+	.ioctl_addr(ioctl_addr),				// in WIDE mode address will be incremented by 2
 	.ioctl_dout(ioctl_dout),
 	.ioctl_wait(ioctl_wait),
+	.ioctl_file_ext(ioctl_file_ext),
 	
 	.joystick_0(joystick_0),
 	.joystick_1(joystick_1),
@@ -277,7 +278,7 @@ mo_core mo_core
 
 	.mo5(status[8]),
 	.azerty(azerty),
-        .dcmoto(dcmoto),
+	.dcmoto(dcmoto),
 	.rewind(status[10]),
 	.fast(status[9]),
 	.ovo_ena(status[7]),
