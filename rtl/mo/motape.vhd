@@ -47,7 +47,12 @@ ENTITY motape IS
 
     fast           : IN std_logic;
     sysclk         : IN std_logic;
-    reset_na       : IN std_logic);
+    reset_na       : IN std_logic;
+	 
+	 cartouche_presente	: OUT std_logic;
+	 cartouche_addr_wr	: OUT std_logic_vector(13 DOWNTO 0);
+	 cartouche_din			: OUT std_logic_vector(7 DOWNTO 0);
+	 cartouche_we			: OUT std_logic );
     
 END motape;
 
@@ -64,8 +69,7 @@ ARCHITECTURE rtl OF motape IS
   ALIAS  fmt_bpsample : uv16 IS fmt(127 DOWNTO 112); -- Bits Per Sample
   SIGNAL alt : uint8;
 
-  TYPE enum_state IS (sIDLE,sHEAD,
-                      sBLOCK_RIFF,sBLOCK_FMT,sBLOCK_DATA,sBLOCK_SKIP);
+  TYPE enum_state IS (sIDLE,sHEAD,sBLOCK_RIFF,sBLOCK_FMT,sBLOCK_DATA,sBLOCK_SKIP);
   SIGNAL state : enum_state;
 
   SIGNAL ioctl_wait_l,motor_pre_n : std_logic;
@@ -85,6 +89,7 @@ ARCHITECTURE rtl OF motape IS
   SIGNAL rcpt,wcpt : uint6;
   SIGNAL waddr,raddr : uv29;
   SIGNAL loaded,rsample : std_logic;
+  
 BEGIN
 
 
@@ -109,185 +114,227 @@ BEGIN
 -- 64 61 74 61 "data"
 -- BF C3 44 01 Block size
   
-  rk7<=rsample WHEN motor_n='0' ELSE '1';
-  
-  PROCESS(sysclk,reset_na) IS
-    VARIABLE t : uint8;
-  BEGIN
-    IF reset_na='0' THEN
-      ioctl_wait_l<='0';
-      state<=sIDLE;
-      
-    ELSIF rising_edge(sysclk) THEN
-
-      pushsample<='0';
-      pushlast<='0';
-      --------------------------------------------
-      CASE state IS
-        WHEN sIDLE =>
-          IF ioctl_download='1' THEN
-            state<=sHEAD;
-          END IF;
-          wpos<=x"00000000";
-          ioctl_wait_l<='0';
-          ddram_we_l<='0';
-          
-        WHEN sHEAD =>
-          loaded<='0';
-          -- Block header
-          IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
-            t:=to_integer(unsigned(ioctl_data));
-            IF wpos=0 THEN head(1)<=character'val(t); END IF;
-            IF wpos=1 THEN head(2)<=character'val(t); END IF;
-            IF wpos=2 THEN head(3)<=character'val(t); END IF;
-            IF wpos=3 THEN head(4)<=character'val(t); END IF;
-            IF wpos=4 THEN size( 7 DOWNTO 0)<=unsigned(ioctl_data); END IF;
-            IF wpos=5 THEN size(15 DOWNTO 8)<=unsigned(ioctl_data); END IF;
-            IF wpos=6 THEN size(23 DOWNTO 16)<=unsigned(ioctl_data); END IF;
-            IF wpos=7 THEN size(31 DOWNTO 24)<=unsigned(ioctl_data); END IF;
-            
-            wpos<=wpos+1;
-            IF wpos=7 THEN
-              wpos<=x"00000000";
-              IF head="RIFF" THEN
-                state<=sBLOCK_RIFF;
-              ELSIF head="fmt " THEN
-                state<=sBLOCK_FMT;
-              ELSIF head="data" THEN
-                state<=sBLOCK_DATA;
-              ELSE
-                state<=sBLOCK_SKIP;
-              END IF;
-            END IF;
-          END IF;
-          
-        WHEN sBLOCK_RIFF =>
-          filesize<=size;
-          IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
-            wpos<=wpos+1;
-            IF wpos=3 THEN
-              wpos<=x"00000000";
-              state<=sHEAD;
-            END IF;
-          END IF;
-          
-        WHEN sBLOCK_FMT =>
-          IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
-            fmt(to_integer(wpos)*8+7 DOWNTO
-                to_integer(wpos)*8)<=unsigned(ioctl_data);
-            wpos<=wpos+1;
-            IF wpos=size-1 THEN
-              wpos<=x"00000000";
-              state<=sHEAD;
-            END IF;
-          END IF;
-          
-        WHEN sBLOCK_SKIP =>
-          IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
-            wpos<=wpos+1;
-            IF wpos=size-1 THEN
-              wpos<=x"00000000";
-              state<=sHEAD;
-            END IF;
-          END IF;
-          
-        WHEN sBLOCK_DATA =>
-          IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
-            wpos<=wpos+1;
-            IF alt=0 AND fmt_bpsample=8 THEN
-              sample<=ioctl_data(7);
-              pushsample<='1';
-            END IF;
-            IF alt=1 AND fmt_bpsample=16 THEN
-              sample<=NOT ioctl_data(7);
-              pushsample<='1';
-            END IF;
-            
-            IF alt=fmt_bpbloc-1 THEN
-              alt<=0;
-            ELSE
-              alt<=alt+1;
-            END IF;
-            
-          END IF;
-          IF ioctl_download='0' THEN
-            pushlast<='1';
-            loaded<='1';
-          END IF;
-          
-      END CASE;
-      
-      --------------------------------------------
-      IF ioctl_download='0' THEN
-        state<=sIDLE;
-      END IF;
-      
-      --------------------------------------------
-      IF state=sIDLE THEN
-        wcpt<=0;
-        waddr<=(OTHERS =>'0');
-      ELSIF pushsample='1' THEN
-        wshift(wcpt)<=sample;
-        wcpt<=(wcpt+1) MOD 64;
-      END IF;
-
-      pushsample2<=pushsample;
-      IF (pushsample2='1' AND wcpt=0) OR pushlast='1' THEN
-        ddram_we_l<='1';
-        ddram_din<=std_logic_vector(wshift);
-        ddram_addr<=std_logic_vector(waddr);
-        waddr<=waddr+1;
-      END IF;
-      
-      --------------------------------------------
-
-	--if ( (cassstate & CASSETTE_MASK_MOTOR) == CASSETTE_MOTOR_DISABLED &&  !state && pos > 0.3 )
-	--{
-	--	/* rewind a little before starting the motor */
-	--	m_cassette->seek(-0.3, SEEK_CUR );
-	--}
-      motor_pre_n<=motor_n;
-      
-      IF loaded='0' OR rewind='1' THEN
-        raddr<=(OTHERS =>'0');
-        rcpt<=0;
-        ddram_rd_l<='0';
-        rpos<=x"00000000";
-        
-      ELSIF motor_n='0' AND motor_pre_n='1' THEN
-        IF rpos>206 THEN
-          rpos<=rpos - 206;
-        END IF;
-        
-      ELSIF tick='1' AND motor_n='0' THEN
-        IF rcpt=0 THEN
-          ddram_rd_l<='1';
-          ddram_addr<=std_logic_vector(raddr);
-          raddr<=raddr+1;
-        END IF;
-        rcpt<=(rcpt + 1 ) MOD 64;
-        rsample<=rshift((rcpt+63) MOD 64);
-        rpos<=rpos+1;
-        
-      END IF;
-      
-      IF ddram_dout_ready='1' THEN
-        rshift<=unsigned(ddram_dout);
-      END IF;
-      
-      --------------------------------------------
-      IF ddram_we_l='1' AND ddram_busy='0' THEN
-        ddram_we_l<='0';
-      END IF;
-      IF ddram_rd_l='1' AND ddram_busy='0' THEN
-        ddram_rd_l<='0';
-      END IF;
-      
-      --------------------------------------------
-      ddram_addr(28 DOWNTO 25)<="0011";
-      
-    END IF;
-  END PROCESS;
+	rk7<=rsample WHEN motor_n='0' ELSE '1';
+	
+	PROCESS(sysclk,reset_na) IS
+		VARIABLE t : uint8;
+	BEGIN
+	
+		IF reset_na='0' THEN
+			ioctl_wait_l<='0';
+			state<=sIDLE;
+			cartouche_we<='0';
+			cartouche_presente<='0';
+			
+		ELSIF rising_edge(sysclk) THEN
+		
+			IF ioctl_index(0)='0' THEN
+			
+				pushsample<='0';
+				pushlast<='0';
+			
+				CASE state IS
+			
+					WHEN sIDLE =>
+						IF ioctl_download='1' THEN
+							state<=sHEAD;
+						END IF;
+						wpos<=x"00000000";
+						ioctl_wait_l<='0';
+						ddram_we_l<='0';
+						
+					WHEN sHEAD =>
+						loaded<='0';
+						-- Block header si octet valide et wait = 1 si pas pret.
+						IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
+							t:=to_integer(unsigned(ioctl_data));
+							IF wpos=0 THEN head(1)<=character'val(t); END IF;
+							IF wpos=1 THEN head(2)<=character'val(t); END IF;
+							IF wpos=2 THEN head(3)<=character'val(t); END IF;
+							IF wpos=3 THEN head(4)<=character'val(t); END IF;
+							IF wpos=4 THEN size( 7 DOWNTO 0)<=unsigned(ioctl_data); END IF;
+							IF wpos=5 THEN size(15 DOWNTO 8)<=unsigned(ioctl_data); END IF;
+							IF wpos=6 THEN size(23 DOWNTO 16)<=unsigned(ioctl_data); END IF;
+							IF wpos=7 THEN size(31 DOWNTO 24)<=unsigned(ioctl_data); END IF;
+							wpos<=wpos+1;
+							IF wpos=7 THEN
+								wpos<=x"00000000";
+								IF head="RIFF" THEN
+									state<=sBLOCK_RIFF;
+								ELSIF head="fmt " THEN
+									state<=sBLOCK_FMT;
+								ELSIF head="data" THEN
+									state<=sBLOCK_DATA;
+								ELSE
+									state<=sBLOCK_SKIP;
+								END IF;
+							END IF;
+						END IF;
+						
+					WHEN sBLOCK_RIFF =>
+						filesize<=size;
+						IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
+							wpos<=wpos+1;
+							IF wpos=3 THEN
+								wpos<=x"00000000";
+								state<=sHEAD;
+							END IF;
+						END IF;
+						
+					WHEN sBLOCK_FMT =>
+						IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
+							fmt(to_integer(wpos)*8+7 DOWNTO to_integer(wpos)*8)<=unsigned(ioctl_data);
+							wpos<=wpos+1;
+							IF wpos=size-1 THEN
+								wpos<=x"00000000";
+								state<=sHEAD;
+							END IF;
+						END IF;
+						
+					WHEN sBLOCK_SKIP =>
+						IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
+							wpos<=wpos+1;
+							IF wpos=size-1 THEN
+								wpos<=x"00000000";
+								state<=sHEAD;
+							END IF;
+						END IF;
+						
+					WHEN sBLOCK_DATA =>
+						IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
+							wpos<=wpos+1;
+							IF alt=0 AND fmt_bpsample=8 THEN
+								sample<=ioctl_data(7);
+								pushsample<='1';
+							END IF;
+							IF alt=1 AND fmt_bpsample=16 THEN
+								sample<=NOT ioctl_data(7);
+								pushsample<='1';
+							END IF;
+							IF alt=fmt_bpbloc-1 THEN
+								alt<=0;
+							ELSE
+								alt<=alt+1;
+							END IF;
+						END IF;
+						IF ioctl_download='0' THEN
+							pushlast<='1';
+							loaded<='1';
+						END IF;
+						
+				END CASE;
+				
+				IF ioctl_download='0' THEN
+					state<=sIDLE;
+				END IF;
+				
+				IF state=sIDLE THEN
+					wcpt<=0;
+					waddr<=(OTHERS =>'0');
+				ELSIF pushsample='1' THEN
+					wshift(wcpt)<=sample;	-- wshift fait 64 bits
+					wcpt<=(wcpt+1) MOD 64;	-- de 0 a 63
+				END IF;
+				
+				pushsample2<=pushsample;
+				IF (pushsample2='1' AND wcpt=0) OR pushlast='1' THEN
+					ddram_we_l<='1';
+					ddram_din<=std_logic_vector(wshift);
+					ddram_addr<=std_logic_vector(waddr);
+					waddr<=waddr+1;
+				END IF;
+				
+				-- if ( (cassstate & CASSETTE_MASK_MOTOR) == CASSETTE_MOTOR_DISABLED &&  !state && pos > 0.3 )
+				-- {
+				--		/* rewind a little before starting the motor */
+				--		m_cassette->seek(-0.3, SEEK_CUR );
+				-- }
+				motor_pre_n<=motor_n;
+				
+				IF loaded='0' OR rewind='1' THEN
+					raddr<=(OTHERS =>'0');
+					rcpt<=0;
+					ddram_rd_l<='0';
+					rpos<=x"00000000";
+				ELSIF motor_n='0' AND motor_pre_n='1' THEN
+					IF rpos>206 THEN
+						rpos<=rpos - 206;
+					END IF;
+				ELSIF tick='1' AND motor_n='0' THEN
+					IF rcpt=0 THEN
+						ddram_rd_l<='1';
+						ddram_addr<=std_logic_vector(raddr);
+						raddr<=raddr+1;
+					END IF;
+					rcpt<=(rcpt + 1 ) MOD 64;
+					rsample<=rshift((rcpt+63) MOD 64);
+					rpos<=rpos+1;
+				END IF;
+				
+				IF ddram_dout_ready='1' THEN
+					rshift<=unsigned(ddram_dout);
+				END IF;
+				
+				IF ddram_we_l='1' AND ddram_busy='0' THEN
+					ddram_we_l<='0';
+				END IF;
+				IF ddram_rd_l='1' AND ddram_busy='0' THEN
+					ddram_rd_l<='0';
+				END IF;
+				
+				ddram_addr(28 DOWNTO 25)<="0011";
+				
+				--                  XXXX XXXX XXXX XXXX -> Memoire 64ko MO5
+				-- X XXX0 0000 0000 0000 0000 0000 0000 -> [28:0] DDRAM_ADDR 512Mo
+				-- Decalage dans la DDR3 (1GB DDR3 SDRAM, 32-bit data bus, on lit des mots de 64 bits)
+				
+			ELSE	-- [Serge] Gestion des cartouches : ioctl_index(0)='1'
+			
+				CASE state IS
+			
+					WHEN sIDLE =>
+						IF ioctl_download='1' THEN
+							state<=sBLOCK_DATA;
+						END IF;
+						ioctl_wait_l<='0';
+						waddr<=(OTHERS =>'0');
+						cartouche_we<='0';
+						
+					WHEN sBLOCK_DATA =>
+						IF ioctl_wr='1' AND ioctl_wait_l='0' THEN
+							IF waddr<16384 THEN	-- 0100 0000 0000 0000
+								t:=to_integer(unsigned(ioctl_data));
+								cartouche_addr_wr<=std_logic_vector(waddr(13 DOWNTO 0));
+								cartouche_din<=std_logic_vector(to_unsigned(t, cartouche_din'length));
+								state<=sHEAD;
+							END IF;
+						END IF;
+						
+					WHEN sHEAD =>
+						cartouche_we<='1';
+						state<=sBLOCK_SKIP;	-- Impulsion sur WE
+						
+					WHEN sBLOCK_SKIP =>
+						cartouche_we<='0';	-- Increment de l'adresse
+						waddr<=waddr+1;
+						state<=sBLOCK_DATA;
+						
+					WHEN others =>
+						cartouche_presente<='0';
+						cartouche_we<='0';
+						state<=sIDLE;
+						
+				END CASE;
+				
+				IF ioctl_download='0' AND waddr > 16383 THEN
+					cartouche_presente<='1';
+					cartouche_we<='0';
+					state<=sIDLE;
+				END IF;
+				
+			END IF;
+		END IF;
+	END PROCESS;
     
   -------------------------------------------------
   ClockGen:PROCESS (sysclk, reset_na)
@@ -343,6 +390,7 @@ BEGIN
         ELSE
           divcpt<=divcpt+1;
         END IF;
+
         
         IF vdivr(64)='0' THEN
           vdivr(64 DOWNTO 32)<=vdivr(63 DOWNTO 31) - vdivi;

@@ -4,7 +4,7 @@
 -- DO 12/2019
 --------------------------------------------------------------------------------
 
--- - Touches spéciales clavier. Revoir mapping clavier
+-- - Touches spéciales clavier. Revoir mapping clavierBASIC
 -- - Crayon optique. Compteur & curseur
 -- - Joysticks
 -- - Souris
@@ -92,8 +92,8 @@ END mo_core;
 ARCHITECTURE struct OF mo_core IS
   
   CONSTANT CPU_ALTERNATE : boolean :=false;
-  SIGNAL ioctl_download2 : std_logic;
-  SIGNAL adrs : uv17;
+  -- SIGNAL ioctl_download2 : std_logic;
+  -- SIGNAL adrs : uv17;
   SIGNAL ps2_key_delay : std_logic_vector(10 DOWNTO 0);
   SIGNAL ps2_mouse_delay : std_logic_vector(24 DOWNTO 0);
   
@@ -152,7 +152,7 @@ ARCHITECTURE struct OF mo_core IS
   SIGNAL vborder : uv4;
 
   SIGNAL bankswitch : std_logic;
-  
+
   SIGNAL tape_motor_n,rk7,wk7 : std_logic;
   SIGNAL tratio : uv8;
   SIGNAL tpos : uv32;
@@ -171,6 +171,19 @@ ARCHITECTURE struct OF mo_core IS
   SIGNAL cpu2_avma,cpu2_busy : std_logic;
   SIGNAL cpu2_ndmabreq : std_logic;
   SIGNAL cpu2_tick2,cpu2_reset_n : std_logic;
+  
+  ----------------------------------------
+  SIGNAL	cartouche_presente : std_logic;
+  SIGNAL	cartouche_addr_rd : std_logic_vector(13 DOWNTO 0);
+  SIGNAL	cartouche_addr_wr : std_logic_vector(13 DOWNTO 0);
+  SIGNAL	cartouche_din : std_logic_vector(7 DOWNTO 0);
+  SIGNAL	cartouche_dout : std_logic_vector(7 DOWNTO 0);
+  SIGNAL	cartouche_we : std_logic;
+  -- unsigned = std_logic_vector avec possibilite de faire des operations
+  SIGNAL adresse_lecture : unsigned(14 DOWNTO 0) := (OTHERS =>'0');
+  SIGNAL adresse_lecture_rom : unsigned(15 DOWNTO 0) := (OTHERS =>'0');
+  TYPE enum_etat IS (LECTURE,ECRITURE);
+  SIGNAL etat : enum_etat;
   
   COMPONENT mc6809i
     PORT (
@@ -195,14 +208,25 @@ ARCHITECTURE struct OF mo_core IS
       );
   END COMPONENT mc6809i;
   
+	COMPONENT cartouche IS
+	PORT (
+		clk : IN std_logic;
+		addr_rd : IN std_logic_vector(13 DOWNTO 0);
+		addr_wr : IN std_logic_vector(13 DOWNTO 0);
+		din : IN std_logic_vector(7 DOWNTO 0);
+		dout : OUT std_logic_vector(7 DOWNTO 0);
+		we : IN std_logic
+	);
+	END COMPONENT cartouche;
+  
   ----------------------------------------
-  SHARED VARIABLE ROM : arr8(0 TO 65536-1) :=
-    ROM_BASIC6_0 & ROM_MO6_0 & ROM_BASIC6_1 & ROM_MO6_1 &
-    ROM_BASIC6_2 & ROM_BASIC6_3; -- 64k ROM
+
+  SHARED VARIABLE ROM : arr8(0 TO 65536-1) := ROM_BASIC6_0 & ROM_MO6_0 & ROM_BASIC6_1 & ROM_MO6_1 & ROM_BASIC6_2 & ROM_BASIC6_3; -- 64k ROM
+  
   CONSTANT PAD : arr8(0 TO 63):=(OTHERS =>x"FF");
   SHARED VARIABLE ROM_DISK : arr8(0 TO 2047); -- :=ROM_DISK & PAD; -- 2k ROM
   
-  SHARED VARIABLE RAM : arr8(0 TO 65536*2-1); -- 128k RAM
+  SHARED VARIABLE RAM : arr8(0 TO 65536*2-1); -- 128k ----------------------------------------RAM
   ATTRIBUTE ramstyle : string;
   ATTRIBUTE ramstyle OF ROM : VARIABLE IS "no_rw_check";
   ATTRIBUTE ramstyle OF RAM : VARIABLE IS "no_rw_check";
@@ -220,6 +244,16 @@ BEGIN
   
   reset_na<='0' WHEN reset='1' ELSE
             '1' WHEN rising_edge(sysclk);
+				
+	ram_cartouche : cartouche
+	PORT MAP (
+		clk => sysclk,
+		addr_rd => cartouche_addr_rd,
+		addr_wr => cartouche_addr_wr,
+		din => cartouche_din,
+		dout => cartouche_dout,
+		we => cartouche_we
+	);
 
   PROCESS(sysclk,reset_na) IS
     CONSTANT C_TICK : uv32 :="00000000000000000000000000000100";
@@ -439,7 +473,7 @@ BEGIN
       in0     => ovo_in0,
       in1     => ovo_in1
       );
-
+		
   ovo_in0 <=
     "0000" & ps2_key(8) &
     '0' & unsigned(ps2_key(7 DOWNTO 4)) &
@@ -506,8 +540,7 @@ BEGIN
     "10000" & 
     "10000" & "10000" & "10000" & "10000" &
     "10000" & "10000" & "10000" & "10000";
-
-
+	 
   xposu<=to_signed(xpos,12);
   yposu<=to_signed(ypos,12);
   
@@ -658,18 +691,49 @@ BEGIN
   
   cpu_arom(11 DOWNTO 0)<=cpu_a(11 DOWNTO 0);
   cpu_arom(15 DOWNTO 12)<=
-    '0' & pia1_pa_o(5)  & "00" WHEN cpu_a(15 DOWNTO 12)=x"C" AND basic='0' ELSE -- 
-    '0' & pia1_pa_o(5)  & "01" WHEN cpu_a(15 DOWNTO 12)=x"D" AND basic='0' ELSE -- 
-    '0' & pia1_pa_o(5)  & "10" WHEN cpu_a(15 DOWNTO 12)=x"E" AND basic='0' ELSE -- 
-    '0' & pia1_pa_o(5)  & "11" WHEN cpu_a(15 DOWNTO 12)=x"F" ELSE               -- 
-    '1' & pia1_pa_o(5)  & "00" WHEN cpu_a(15 DOWNTO 12)=x"B" AND basic='1' ELSE -- 
-    '1' & pia1_pa_o(5)  & "01" WHEN cpu_a(15 DOWNTO 12)=x"C" AND basic='1' ELSE -- 
-    '1' & pia1_pa_o(5)  & "10" WHEN cpu_a(15 DOWNTO 12)=x"D" AND basic='1' ELSE -- 
-    '1' & pia1_pa_o(5)  & "11" WHEN cpu_a(15 DOWNTO 12)=x"E" AND basic='1' ELSE -- 
-    '0' & pia1_pa_o(5)  & "11";
-  
-  rom_dr<=ROM(to_integer(cpu_arom)) WHEN rising_edge(sysclk);
-  
+    '0' & pia1_pa_o(5)  & "00" WHEN cpu_a(15 DOWNTO 12)=x"C" AND basic='0' ELSE --
+    '0' & pia1_pa_o(5)  & "01" WHEN cpu_a(15 DOWNTO 12)=x"D" AND basic='0' ELSE --
+    '0' & pia1_pa_o(5)  & "10" WHEN cpu_a(15 DOWNTO 12)=x"E" AND basic='0' ELSE --
+    '0' & pia1_pa_o(5)  & "11" WHEN cpu_a(15 DOWNTO 12)=x"F" ELSE               --
+	 
+    '1' & pia1_pa_o(5)  & "00" WHEN cpu_a(15 DOWNTO 12)=x"B" AND basic='1' ELSE --
+    '1' & pia1_pa_o(5)  & "01" WHEN cpu_a(15 DOWNTO 12)=x"C" AND basic='1' ELSE --
+    '1' & pia1_pa_o(5)  & "10" WHEN cpu_a(15 DOWNTO 12)=x"D" AND basic='1' ELSE --
+    '1' & pia1_pa_o(5)  & "11" WHEN cpu_a(15 DOWNTO 12)=x"E" AND basic='1' ELSE --
+    
+	 '0' & pia1_pa_o(5)  & "11";
+
+	rom_dr<=ROM(to_integer(cpu_arom)) WHEN rising_edge(sysclk);
+
+	PROCESS(sysclk) IS
+	BEGIN
+		IF reset_na='0' THEN
+			adresse_lecture <= "000000000000000";
+			etat <= LECTURE;
+
+		-- rising_edge = 0 -> 1
+		-- falling_edge = 1 -> 0
+			
+		ELSIF falling_edge(sysclk) THEN
+			IF cartouche_presente='1' THEN
+				IF adresse_lecture < 16384 THEN	-- < 0100 0000 0000 0000
+					CASE etat IS
+						WHEN LECTURE =>
+							cartouche_addr_rd <= std_logic_vector(adresse_lecture(13 DOWNTO 0));
+							adresse_lecture_rom <= adresse_lecture+x"8000";
+							etat <= ECRITURE;
+						WHEN ECRITURE =>
+							ROM(to_integer(adresse_lecture_rom)) := unsigned(cartouche_dout);
+							adresse_lecture <= adresse_lecture + 1;
+							etat <= LECTURE;
+						WHEN others =>
+							etat <= LECTURE;
+					END CASE;
+				END IF;
+			END IF;
+		END IF;
+	END PROCESS;
+	
   romdisk_dr<=x"FF";
   
   ----------------------------------------------------------
@@ -762,8 +826,7 @@ BEGIN
         l_hlr<=hlr;
       END IF;
       
-      lpen_clr<=to_std_logic(cpu_a=x"A7E5" AND cpu_ack='1' AND cpu_wr='0'
-                             AND selreg='1');
+      lpen_clr<=to_std_logic(cpu_a=x"A7E5" AND cpu_ack='1' AND cpu_wr='0' AND selreg='1');
       
       IF cpu_a=x"A7DA" AND cpu_wr='1' AND cpu_ack='1' THEN
         -- Palette Data
@@ -793,7 +856,7 @@ BEGIN
       IF cpu_a=x"A7DD" AND cpu_wr='1' AND cpu_ack='1' THEN
         vborder<=cpu_dw(3 DOWNTO 0); -- Border colour
         basic<=cpu_dw(4); -- 0=Basic 1 1=Basic 128
-        cart <=cpu_dw(5); -- Cartrdige mapping
+        cart <=cpu_dw(5); -- Cartridge mapping
         vpage<=cpu_dw(7 DOWNTO 6); -- Video page 0...3
       END IF;
       
@@ -995,8 +1058,9 @@ BEGIN
   END PROCESS;
   
   -- capslock<=pia1_pa_o(4);
-  capslock <= crayon;
-  
+  -- capslock <= crayon;
+  capslock <= cartouche_presente;
+      
   ----------------------------------------------------------
   KeyCodes:PROCESS (sysclk,reset_na) IS
   BEGIN
@@ -1423,15 +1487,15 @@ BEGIN
   BEGIN
     IF rising_edge(sysclk) THEN
 
-		IF crayon='1' THEN
+--		IF crayon='1' THEN
 		
 			-- TODO : Prendre en compte le crayon optique
 		
-			xpos<=10;
-			ypos<=10;
-			lpen_button<=ps2_mouse(0);
+--			xpos<=10;
+--			ypos<=10;
+--			lpen_button<=ps2_mouse(0);
 			
-		ELSE
+--		ELSE
 		
 			ps2_mouse_delay<=ps2_mouse;
 			
@@ -1464,7 +1528,7 @@ BEGIN
 							AND selreg AND NOT lpen_clr;
 			lpen_button<=ps2_mouse(0);
 			
-		END IF;
+--		END IF;
 			
     END IF;
 		
@@ -1504,13 +1568,14 @@ BEGIN
       ioctl_addr     => ioctl_addr,
       ioctl_data     => ioctl_dout,
       ioctl_wait     => ioctl_wait,
-      
+		
       ddram_clk        => ddram_clk,
       ddram_busy       => ddram_busy,
       ddram_burstcnt   => ddram_burstcnt,
       ddram_addr       => ddram_addr,
       ddram_dout       => ddram_dout,
-      ddram_dout_ready => ddram_dout_ready,
+      ddram_dout_ready => ddram_dout_ready,						
+
       ddram_rd         => ddram_rd,
       ddram_din        => ddram_din,
       ddram_be         => ddram_be,
@@ -1518,6 +1583,12 @@ BEGIN
       
       fast           => fast,
       sysclk         => sysclk,
-      reset_na       => reset_na);
+      reset_na       => reset_na,
+		
+		cartouche_presente	=> cartouche_presente,
+		cartouche_addr_wr 	=> cartouche_addr_wr,
+		cartouche_din			=> cartouche_din,
+		cartouche_we			=> cartouche_we
+	);
   
 END ARCHITECTURE struct;
