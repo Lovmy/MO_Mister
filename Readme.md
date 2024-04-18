@@ -19,19 +19,15 @@ db_url = https://raw.githubusercontent.com/Lovmy/MiSTer/db/db.json.zip
 ## Developpement
 
 Je débute dans la programmation en Verilog/VHDL. J'ai repris le code fait par Grabulosaure et j'essai d'y apporter des améliorations.<br/>
-Dans la dernière version l'image est mal cadré sur un écran cathodique :
 
-![Original](https://banaszak.fr/MiSTer/ORIGINAL.PNG)
+La dernière version apporte :
 
-J'ai centré l'image:
+- Le centrage de l'image sur un écran cathodique (CRT).
+- L'affichage ou pas de la bordure.
+- La prise en compte des cartouches.
 
-![Centrage](https://banaszak.fr/MiSTer/CENTRE.PNG)
-
-Et j'ai ajouté l'affichage de la bordure:
-
-![Bordure](https://banaszak.fr/MiSTer/BORDURE.PNG)
+Pour ce dernier point il faut charger la cartouche à l'aide du choix dans le menu OSD, puis cliquer sur le Basic 128 dans le menu du MO6.
 
 ## Evolution
 
-Je vais continuer de m'entrainer sur ce core pour y apporter la prise en charge des cartouches et du crayon optique via le port User IO.<br/>
-Pour ce dernier point je vais me baser sur [MiSTerLaggy](https://github.com/MiSTer-devel/MiSTerLaggy_MiSTer).
+Je vais continuer de m'entrainer sur ce core pour y apporter la prise en charge du crayon optique via le port User IO.<br/>
