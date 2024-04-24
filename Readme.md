@@ -12,7 +12,7 @@ basé sur la code original de [Grabulosaure](https://github.com/Grabulosaure/MO_
 Ajouter la ligne suivante dans la fichier `downloader.ini` puis effectuer un *downloader* ou *update_all*.
 
 ```ini
-[Lovmy]
+[Lovmy/mister]
 db_url = https://raw.githubusercontent.com/Lovmy/MiSTer/db/db.json.zip
 ```
 
